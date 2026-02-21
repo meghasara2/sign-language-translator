@@ -188,6 +188,30 @@ class Glosser:
             
         return []
 
+    async def llm_english(self, glosses: List[str]) -> str:
+        """Use Gemini to translate ASL/ISL Gloss array to English sentence."""
+        if not self.model or not glosses:
+            return " ".join(glosses).title() + "."
+            
+        gloss_str = ", ".join(glosses)
+        prompt = f"""
+        Convert the following Sign Language Gloss sequence into a natural, grammatically correct English sentence.
+        
+        Input Gloss: [{gloss_str}]
+        
+        Return ONLY the final English sentence. Do not add quotes or explanations.
+        """
+        
+        try:
+            response = self.model.generate_content(prompt)
+            if response and response.text:
+                logger.info(f"Gemini reverse translated {glosses} -> '{response.text.strip()}'")
+                return response.text.strip()
+        except Exception as e:
+            logger.error(f"Gemini reverse translation failed: {e}")
+            
+        return " ".join(glosses).title() + "."
+
     async def gloss(self, text: str) -> List[str]:
         """
         Convert English text to Sign Language gloss sequence.

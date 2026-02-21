@@ -24,6 +24,8 @@ function SignToTextPanel({ onRecognition, isConnected }) {
     const [isTTSEnabled, setIsTTSEnabled] = useState(true)
     const [currentPrediction, setCurrentPrediction] = useState(null)
     const [currentGloss, setCurrentGloss] = useState(null)
+    const [glossBuffer, setGlossBuffer] = useState([])
+    const [isTranslating, setIsTranslating] = useState(false)
     const [confidence, setConfidence] = useState(0)
     const [error, setError] = useState(null)
 
@@ -37,6 +39,7 @@ function SignToTextPanel({ onRecognition, isConnected }) {
     const cameraRef = useRef(null)
     const framesBufferRef = useRef([]) // 30-frame sliding window
     const lastPredictionTimeRef = useRef(0) // Throttle API calls
+    const lastGlossTimeRef = useRef(Date.now()) // Track pauses for the buffer
 
     // Handle incoming predictions (now via POST, not WebSocket)
     // useEffect(() => {
@@ -55,20 +58,70 @@ function SignToTextPanel({ onRecognition, isConnected }) {
     // }, [lastMessage, isTTSEnabled, onRecognition])
 
     const handlePredictionResult = useCallback((text, gloss, conf) => {
-        if (!text || text === "") return;
+        if (!gloss || gloss === "" || gloss === "ERROR" || gloss === "IDLE") return;
 
-        setCurrentPrediction(text)
+        // Only accept if confidence is reasonable
+        if (conf < 0.6) return;
+
         setCurrentGloss(gloss)
         setConfidence(conf)
 
-        // Notify parent
-        onRecognition?.(text)
+        // Add to buffer if it's different from the last sign
+        setGlossBuffer(prev => {
+            const lastSign = prev.length > 0 ? prev[prev.length - 1] : null
+            if (lastSign !== gloss) {
+                lastGlossTimeRef.current = Date.now()
+                return [...prev, gloss]
+            }
+            // Even if it's the same sign, we keep detecting it so it's not a pause yet 
+            lastGlossTimeRef.current = Date.now()
+            return prev
+        })
 
-        // Text-to-Speech
-        if (isTTSEnabled) {
-            speak(text)
+    }, [])
+
+    // Buffer processing timer
+    useEffect(() => {
+        const checkBuffer = async () => {
+            if (glossBuffer.length > 0 && !isTranslating) {
+                const now = Date.now()
+                // If 5 seconds have passed since the last unique sign was detected
+                if (now - lastGlossTimeRef.current > 5000) {
+                    setIsTranslating(true)
+                    const bufferToSend = [...glossBuffer]
+                    setGlossBuffer([]) // Clear buffer immediately
+
+                    try {
+                        const response = await fetch('http://localhost:8000/translate-to-english', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ glosses: bufferToSend })
+                        })
+
+                        if (response.ok) {
+                            const data = await response.json()
+                            if (data.text) {
+                                setCurrentPrediction(data.text)
+                                onRecognition?.(data.text)
+
+                                // Text-to-Speech
+                                if (isTTSEnabled) {
+                                    speak(data.text)
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Reverse translation error:", err)
+                    } finally {
+                        setIsTranslating(false)
+                    }
+                }
+            }
         }
-    }, [isTTSEnabled, onRecognition])
+
+        const interval = setInterval(checkBuffer, 1000)
+        return () => clearInterval(interval)
+    }, [glossBuffer, isTranslating, isTTSEnabled, onRecognition])
 
     // Start webcam
     const startCamera = async () => {
@@ -125,6 +178,7 @@ function SignToTextPanel({ onRecognition, isConnected }) {
         setIsStreaming(false)
         setCurrentPrediction(null)
         setCurrentGloss(null)
+        setGlossBuffer([])
     }
 
     // MediaPipe Results Handler
@@ -333,10 +387,17 @@ function SignToTextPanel({ onRecognition, isConnected }) {
                 </div>
 
                 <div className="prediction-box gloss-box">
-                    <span className="box-label">SIGN GLOSS</span>
-                    {currentGloss ? (
+                    <span className="box-label">SIGN GLOSS BUFFER</span>
+                    {glossBuffer.length > 0 || currentGloss ? (
                         <>
-                            <span className="gloss-text">{currentGloss}</span>
+                            <div className="gloss-sequence">
+                                {glossBuffer.map((g, i) => (
+                                    <span key={i} className="gloss-tag">{g}</span>
+                                ))}
+                                {currentGloss && !glossBuffer.includes(currentGloss) && (
+                                    <span className="gloss-tag active">{currentGloss}</span>
+                                )}
+                            </div>
                             <div className="confidence-bar">
                                 <div
                                     className="confidence-fill"
@@ -347,7 +408,7 @@ function SignToTextPanel({ onRecognition, isConnected }) {
                         </>
                     ) : (
                         <span className="prediction-placeholder">
-                            Gloss will appear here...
+                            {isTranslating ? <div className="translating"><Loader2 size={16} className="spin" /> Translating...</div> : 'Gloss will appear here...'}
                         </span>
                     )}
                 </div>

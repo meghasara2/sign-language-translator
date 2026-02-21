@@ -21,9 +21,12 @@ from typing import List
 class PredictionRequest(BaseModel):
     frames: List[List[float]]  # List of 30 frames, each with 225 features
 
-# Define request body for translation
 class TranslationRequest(BaseModel):
     text: str
+
+# Define request body for reverse translation (Gloss -> English)
+class ReverseTranslationRequest(BaseModel):
+    glosses: List[str]
 
 # Global model variable
 model = None
@@ -169,8 +172,6 @@ async def translate_to_gloss(request: TranslationRequest):
         glosser = get_glosser()
         gloss = await glosser.gloss(text)
         
-        logger.info(f"Intelligent translation: '{text}' -> Gloss Sequence: {gloss}")
-        
         return {
             "text": text,
             "gloss": gloss
@@ -178,6 +179,30 @@ async def translate_to_gloss(request: TranslationRequest):
     except Exception as e:
         logger.error(f"Translation failed: {e}")
         return {"error": str(e), "gloss": []}
+
+@app.post("/translate-to-english")
+async def translate_to_english(request: ReverseTranslationRequest):
+    """
+    Translate ASL Gloss sequence into a natural English sentence.
+    """
+    try:
+        glosses = request.glosses
+        if not glosses:
+             return {"error": "Empty gloss sequence provided", "text": ""}
+             
+        glosser = get_glosser()
+        text = await glosser.llm_english(glosses)
+        
+        logger.info(f"Reverse translation: {glosses} -> '{text}'")
+        
+        return {
+            "glosses": glosses,
+            "text": text
+        }
+    except Exception as e:
+        logger.error(f"Reverse translation failed: {e}")
+        return {"error": str(e), "text": ""}
+
 
 
 # ============================================
