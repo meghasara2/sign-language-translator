@@ -4,12 +4,11 @@
  * Captures audio, transcribes with Whisper, and displays 3D avatar animations.
  */
 
-import { useState, useRef, useEffect, Suspense } from 'react'
+import { useState, useRef, useEffect, Suspense, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment, ContactShadows } from '@react-three/drei'
 import { Mic, MicOff, Play, Pause, Loader2 } from 'lucide-react'
 import AvatarScene from './AvatarScene'
-import useWebSocket from '../hooks/useWebSocket'
 import './SpeechToSignPanel.css'
 
 function SpeechToSignPanel({ onGloss, isConnected }) {
@@ -18,41 +17,97 @@ function SpeechToSignPanel({ onGloss, isConnected }) {
     const [glossSequence, setGlossSequence] = useState([])
     const [currentAnimationIndex, setCurrentAnimationIndex] = useState(0)
     const [isPlaying, setIsPlaying] = useState(false)
-    const mediaRecorderRef = useRef(null)
-    const audioChunksRef = useRef([])
-    const mimeTypeRef = useRef('audio/webm')
+    const recognitionRef = useRef(null)
 
-    const processedMessageRef = useRef(null)
-
-    // WebSocket connection
-    const { isOpen, send, lastMessage } = useWebSocket(
-        isConnected ? 'ws://localhost:8000/ws/speech-to-sign' : null
-    )
-
-    // Handle incoming gloss sequences
+    // Initialize Web Speech API
     useEffect(() => {
-        if (lastMessage && lastMessage !== processedMessageRef.current && lastMessage.type === 'gloss') {
-            processedMessageRef.current = lastMessage
-
-            setTranscription(lastMessage.text)
-            setGlossSequence(lastMessage.gloss)
-            setCurrentAnimationIndex(0)
-            setIsPlaying(true)
-
-            // Notify parent
-            onGloss?.(lastMessage.gloss)
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            console.error("Web Speech API is not supported in this browser.")
+            return;
         }
-    }, [lastMessage, onGloss])
 
-    // Play through animation sequence
-    // Play through animation sequence
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+
+        recognition.continuous = false; // Stop when the user stops talking
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognition.onstart = () => {
+            console.log("[SpeechRecognition] Listening...");
+            setIsListening(true);
+        };
+
+        recognition.onresult = async (event) => {
+            const current = event.resultIndex;
+            const transcript = event.results[current][0].transcript;
+            console.log("[SpeechRecognition] Recognized:", transcript);
+
+            setTranscription(transcript);
+
+            // Send to backend for translation
+            translateToGloss(transcript);
+        };
+
+        recognition.onerror = (event) => {
+            console.error("[SpeechRecognition] Error:", event.error);
+            if (event.error !== 'no-speech') {
+                setIsListening(false);
+            }
+        };
+
+        recognition.onend = () => {
+            console.log("[SpeechRecognition] Disconnected.");
+            setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+
+        return () => {
+            if (recognitionRef.current) {
+                recognitionRef.current.abort();
+            }
+        }
+    }, [])
+
+    const translateToGloss = async (text) => {
+        try {
+            const response = await fetch('http://localhost:8000/translate-to-gloss', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setGlossSequence(data.gloss);
+                setCurrentAnimationIndex(0);
+                setIsPlaying(true);
+
+                onGloss?.(data.gloss);
+            } else {
+                console.error("Failed to translate:", await response.text());
+            }
+        } catch (err) {
+            console.error("Translation API Error:", err);
+        }
+    }
+
+    // Play through animation sequence with 'Rest/Idle' interpolation
     useEffect(() => {
         if (!isPlaying || glossSequence.length === 0) return
 
-        if (currentAnimationIndex < glossSequence.length) {
+        if (currentAnimationIndex < glossSequence.length * 2) {
+
+            // Even indexes are actual signs. Odd indexes are brief 'IDLE' rest poses.
+            const isRestPose = currentAnimationIndex % 2 !== 0;
+            const delay = isRestPose ? 300 : 1800; // 300ms rest, 1.8s sign play time
+
             const timer = setTimeout(() => {
                 setCurrentAnimationIndex(prev => prev + 1)
-            }, 1200) // 1.2 seconds per sign
+            }, delay)
 
             return () => clearTimeout(timer)
         } else {
@@ -60,79 +115,41 @@ function SpeechToSignPanel({ onGloss, isConnected }) {
         }
     }, [isPlaying, currentAnimationIndex, glossSequence])
 
+    // Derive the actual string to send to the avatar
+    const getActiveSign = () => {
+        if (!isPlaying || glossSequence.length === 0) return null;
+        if (currentAnimationIndex >= glossSequence.length * 2) return null;
+
+        // If it's an odd index, we want the avatar to interpolate back to IDLE
+        if (currentAnimationIndex % 2 !== 0) return 'IDLE';
+
+        // Otherwise, return the actual gloss word
+        const actualIndex = Math.floor(currentAnimationIndex / 2);
+        return glossSequence[actualIndex];
+    }
+
+    const currentGlossText = getActiveSign();
+    // For UI Highlighting, we only care about the actual words
+    const displayIndex = Math.floor(currentAnimationIndex / 2);
+
     // Start listening
-    const startListening = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-            console.log('[Frontend] Microphone access granted')
-
-            // Dynamically select MIME type
-            let mimeType = 'audio/webm'
-            if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                mimeType = 'audio/webm;codecs=opus'
-            } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                mimeType = 'audio/mp4' // Safari support
-            } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
-                mimeType = 'audio/ogg' // Firefox fallback
+    const startListening = () => {
+        if (recognitionRef.current && !isListening) {
+            try {
+                recognitionRef.current.start();
+                setTranscription(''); // clear previous
+                setGlossSequence([]);
+            } catch (err) {
+                console.error("Couldn't start recognition:", err);
             }
-            console.log('[Frontend] Using MIME type:', mimeType)
-            mimeTypeRef.current = mimeType
-
-            mediaRecorderRef.current = new MediaRecorder(stream, { mimeType })
-
-            mediaRecorderRef.current.onstart = () => {
-                console.log('[Frontend] MediaRecorder started')
-                audioChunksRef.current = []
-            }
-
-            mediaRecorderRef.current.onerror = (event) => {
-                console.error('[Frontend] MediaRecorder error:', event.error)
-            }
-
-            mediaRecorderRef.current.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunksRef.current.push(event.data)
-                }
-            }
-
-            mediaRecorderRef.current.onstop = async () => {
-                const mimeType = mimeTypeRef.current
-                const audioBlob = new Blob(audioChunksRef.current, { type: mimeType.split(';')[0] }) // Use the determined mimeType for the blob
-                console.log('[Frontend] Audio recording stopped. Blob size:', audioBlob.size)
-
-                // Convert blob to base64
-                const reader = new FileReader()
-                reader.readAsDataURL(audioBlob)
-                reader.onloadend = () => {
-                    const base64Audio = reader.result
-                    console.log('[Frontend] Audio converted to base64. Length:', base64Audio.length)
-
-                    if (isOpen) {
-                        console.log('[Frontend] Sending audio to backend via WebSocket...')
-                        send({
-                            type: 'audio',
-                            audio: base64Audio,
-                            timestamp: Date.now()
-                        })
-                    } else {
-                        console.warn('[Frontend] WebSocket is closed, cannot send audio.')
-                    }
-                }
-            }
-
-            mediaRecorderRef.current.start()
-            setIsListening(true)
-        } catch (error) {
-            console.error('Microphone error:', error)
         }
     }
 
     // Stop listening
     const stopListening = () => {
-        if (mediaRecorderRef.current && isListening) {
-            mediaRecorderRef.current.stop()
-            mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop())
-            setIsListening(false)
+        if (recognitionRef.current && isListening) {
+            recognitionRef.current.stop();
+            setIsListening(false);
         }
     }
 
@@ -146,7 +163,7 @@ function SpeechToSignPanel({ onGloss, isConnected }) {
         }
     }
 
-    const currentGloss = glossSequence[currentAnimationIndex] || null
+    const currentGloss = getActiveSign()
 
     return (
         <div className="speech-to-sign-panel">
@@ -187,7 +204,7 @@ function SpeechToSignPanel({ onGloss, isConnected }) {
 
                         {/* Avatar */}
                         <AvatarScene
-                            currentSign={currentGloss}
+                            currentSign={currentGlossText}
                             isPlaying={isPlaying}
                         />
 
@@ -212,10 +229,10 @@ function SpeechToSignPanel({ onGloss, isConnected }) {
 
                 {/* Current Sign Display */}
                 <div className="current-sign-overlay">
-                    {currentGloss && (
+                    {currentGlossText && currentGlossText !== 'IDLE' && (
                         <div className="current-sign">
                             <span className="sign-label">Signing:</span>
-                            <span className="sign-text">{currentGloss}</span>
+                            <span className="sign-text">{currentGlossText}</span>
                         </div>
                     )}
                 </div>
@@ -224,7 +241,7 @@ function SpeechToSignPanel({ onGloss, isConnected }) {
                 {!isConnected && (
                     <div className="avatar-loading">
                         <Loader2 size={32} className="spin" />
-                        <span>Connecting...</span>
+                        <span>Not Connected to Backend</span>
                     </div>
                 )}
             </div>
@@ -245,7 +262,7 @@ function SpeechToSignPanel({ onGloss, isConnected }) {
                             glossSequence.map((gloss, index) => (
                                 <span
                                     key={index}
-                                    className={`gloss-item ${index === currentAnimationIndex && isPlaying ? 'active' : ''} ${index < currentAnimationIndex ? 'done' : ''}`}
+                                    className={`gloss-item ${index === displayIndex && isPlaying ? 'active' : ''} ${index < displayIndex ? 'done' : ''}`}
                                 >
                                     {gloss}
                                 </span>

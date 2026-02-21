@@ -21,6 +21,10 @@ from typing import List
 class PredictionRequest(BaseModel):
     frames: List[List[float]]  # List of 30 frames, each with 225 features
 
+# Define request body for translation
+class TranslationRequest(BaseModel):
+    text: str
+
 # Global model variable
 model = None
 
@@ -143,6 +147,40 @@ async def predict_sign(request: PredictionRequest):
     except Exception as e:
         logger.error(f"Prediction failed: {e}")
         return {"error": str(e), "gloss": "ERROR", "text": "Error processing sequence"}
+
+
+@app.post("/translate-to-gloss")
+async def translate_to_gloss(request: TranslationRequest):
+    """
+    Translate English text into ASL Gloss sequence.
+    """
+    try:
+        text = request.text
+        if not text:
+            return {"error": "Empty text provided", "gloss": []}
+            
+        import re
+        
+        # Simple NLP logic to simulate English -> ASL Gloss conversion
+        # 1. Uppercase & remove punctuation
+        clean_text = re.sub(r'[^\w\s]', '', text).upper()
+        
+        # 2. Tokenize
+        words = clean_text.split()
+        
+        # 3. Simple Stopword removal and mapping (can be expanded later)
+        stopwords = {"AM", "IS", "ARE", "WAS", "WERE", "BE", "BEING", "BEEN", "A", "AN", "THE", "TO"}
+        gloss = [word for word in words if word not in stopwords]
+        
+        logger.info(f"Translated '{text}' -> Gloss Sequence: {gloss}")
+        
+        return {
+            "text": text,
+            "gloss": gloss
+        }
+    except Exception as e:
+        logger.error(f"Translation failed: {e}")
+        return {"error": str(e), "gloss": []}
 
 
 # ============================================
