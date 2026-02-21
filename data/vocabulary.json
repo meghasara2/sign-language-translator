@@ -1,0 +1,92 @@
+{
+    "name": "DeepBridge Vocabulary",
+    "version": "1.0.0",
+    "language": "ASL",
+    "description": "30-50 high-frequency ASL signs for the DeepBridge system",
+    "categories": {
+        "greetings": [
+            "HELLO",
+            "GOODBYE",
+            "THANK-YOU",
+            "PLEASE",
+            "SORRY"
+        ],
+        "responses": [
+            "YES",
+            "NO",
+            "MAYBE",
+            "OK"
+        ],
+        "questions": [
+            "WHAT",
+            "WHERE",
+            "WHEN",
+            "HOW",
+            "WHY",
+            "WHO",
+            "WHICH"
+        ],
+        "pronouns": [
+            "ME",
+            "YOU",
+            "HE",
+            "SHE",
+            "WE",
+            "THEY"
+        ],
+        "common_verbs": [
+            "WANT",
+            "NEED",
+            "LIKE",
+            "LOVE",
+            "HELP",
+            "GO",
+            "COME",
+            "EAT",
+            "DRINK",
+            "SLEEP",
+            "WORK",
+            "LEARN",
+            "UNDERSTAND",
+            "KNOW",
+            "SEE",
+            "HEAR",
+            "FEEL",
+            "THINK"
+        ],
+        "nouns": [
+            "NAME",
+            "FRIEND",
+            "FAMILY",
+            "MOTHER",
+            "FATHER",
+            "HOME",
+            "SCHOOL",
+            "FOOD",
+            "WATER",
+            "TIME"
+        ],
+        "adjectives": [
+            "GOOD",
+            "BAD",
+            "HAPPY",
+            "SAD",
+            "BIG",
+            "SMALL"
+        ],
+        "time": [
+            "TODAY",
+            "YESTERDAY",
+            "TOMORROW",
+            "NOW",
+            "LATER"
+        ],
+        "emergency": [
+            "EMERGENCY",
+            "DOCTOR",
+            "HOSPITAL",
+            "PAIN"
+        ]
+    },
+    "total_signs": 50
+}

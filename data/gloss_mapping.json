@@ -1,0 +1,99 @@
+{
+    "name": "DeepBridge Gloss Mapping",
+    "version": "1.0.0",
+    "description": "English to ASL gloss conversion rules",
+    "notes": [
+        "ASL uses Topic-Comment structure (often OSV instead of SVO)",
+        "Time markers come at the beginning of sentences",
+        "Articles (a, an, the) are dropped",
+        "Questions end with raised eyebrows and question word"
+    ],
+    "question_patterns": [
+        {
+            "pattern": "what is your (.*)?",
+            "gloss_template": "{1} YOUR WHAT",
+            "example": {
+                "input": "What is your name?",
+                "output": "NAME YOUR WHAT"
+            }
+        },
+        {
+            "pattern": "how are you?",
+            "gloss_template": "YOU HOW",
+            "example": {
+                "input": "How are you?",
+                "output": "YOU HOW"
+            }
+        },
+        {
+            "pattern": "where do you (.*)?",
+            "gloss_template": "YOU {1} WHERE",
+            "example": {
+                "input": "Where do you live?",
+                "output": "YOU LIVE WHERE"
+            }
+        },
+        {
+            "pattern": "when (.*)?",
+            "gloss_template": "{1} WHEN",
+            "example": {
+                "input": "When will you come?",
+                "output": "YOU COME WHEN"
+            }
+        }
+    ],
+    "word_mappings": {
+        "i": "ME",
+        "i'm": "ME",
+        "my": "MY",
+        "you": "YOU",
+        "your": "YOUR",
+        "you're": "YOU",
+        "hello": "HELLO",
+        "hi": "HELLO",
+        "bye": "GOODBYE",
+        "goodbye": "GOODBYE",
+        "thanks": "THANK-YOU",
+        "thank you": "THANK-YOU",
+        "sorry": "SORRY",
+        "please": "PLEASE",
+        "yes": "YES",
+        "yeah": "YES",
+        "no": "NO",
+        "nope": "NO",
+        "ok": "OK",
+        "okay": "OK",
+        "want": "WANT",
+        "need": "NEED",
+        "help": "HELP",
+        "like": "LIKE",
+        "love": "LOVE"
+    },
+    "stop_words": [
+        "a",
+        "an",
+        "the",
+        "is",
+        "am",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "can",
+        "to",
+        "of",
+        "it",
+        "very",
+        "just",
+        "really"
+    ]
+}
