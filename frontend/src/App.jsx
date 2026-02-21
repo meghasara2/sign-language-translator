@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react'
 import SignToTextPanel from './components/SignToTextPanel'
 import SpeechToSignPanel from './components/SpeechToSignPanel'
 import SettingsModal from './components/SettingsModal'
-import { Hand, Mic, Settings, Info, Loader2 } from 'lucide-react'
+import { Hand, Mic, Settings, Info, Loader2, PlayCircle } from 'lucide-react'
 import './App.css'
 
 function App() {
@@ -20,6 +20,7 @@ function App() {
     const [avatarUrl, setAvatarUrl] = useState('/avatar.glb')
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [resetKey, setResetKey] = useState(0) // Global toggle to force child re-renders/resets
+    const [isDemoMode, setIsDemoMode] = useState(false)
 
     // Check backend connection
     useEffect(() => {
@@ -92,6 +93,13 @@ function App() {
                     </div>
 
                     <button
+                        className={`btn icon-btn ${isDemoMode ? 'btn-primary' : 'btn-secondary'}`}
+                        title={isDemoMode ? "Disable Demo Mode" : "Enable Demo Mode"}
+                        onClick={() => setIsDemoMode(!isDemoMode)}
+                    >
+                        <PlayCircle size={20} />
+                    </button>
+                    <button
                         className="btn btn-secondary icon-btn"
                         title="Settings"
                         onClick={() => setIsSettingsOpen(true)}
@@ -139,6 +147,7 @@ function App() {
                                 onRecognition={(text) => addTranscript({ type: 'sign', text })}
                                 isConnected={backendStatus === 'online'}
                                 isActive={activeMode === 'sign-to-text' || activeMode === 'both'}
+                                isDemoMode={isDemoMode}
                             />
                         </div>
                     )}
@@ -152,6 +161,7 @@ function App() {
                                 isConnected={backendStatus === 'online'}
                                 avatarUrl={avatarUrl}
                                 isActive={activeMode === 'speech-to-sign' || activeMode === 'both'}
+                                isDemoMode={isDemoMode}
                             />
                         </div>
                     )}
@@ -198,7 +208,8 @@ function App() {
 
             {/* Footer */}
             <footer className="footer">
-                <p>DeepBridge v0.1.0 • Built with ❤️ for accessibility</p>
+                <p>A Deep Learning Framework for Bidirectional Sign Language Translation and 3D Avatar Synthesis</p>
+                <p className="version">DeepBridge v1.0.0</p>
             </footer>
         </div>
     )

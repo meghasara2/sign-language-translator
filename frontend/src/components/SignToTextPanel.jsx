@@ -17,7 +17,7 @@ import {
 import useWebSocket from '../hooks/useWebSocket'
 import './SignToTextPanel.css'
 
-function SignToTextPanel({ onRecognition, isConnected, isActive }) {
+function SignToTextPanel({ onRecognition, isConnected, isActive, isDemoMode }) {
     const videoRef = useRef(null)
     const canvasRef = useRef(null)
     const [isStreaming, setIsStreaming] = useState(false)
@@ -29,6 +29,8 @@ function SignToTextPanel({ onRecognition, isConnected, isActive }) {
     const [confidence, setConfidence] = useState(0)
     const [error, setError] = useState(null)
     const [copied, setCopied] = useState(false)
+    const [isCalibrating, setIsCalibrating] = useState(false)
+    const [calibrationProgress, setCalibrationProgress] = useState(0)
 
     // WebSocket connection (Disabled while using POST for prediction)
     // const { isOpen, send, lastMessage } = useWebSocket(
@@ -124,10 +126,48 @@ function SignToTextPanel({ onRecognition, isConnected, isActive }) {
         return () => clearInterval(interval)
     }, [glossBuffer, isTranslating, isTTSEnabled, onRecognition])
 
+    // Demo Mode Simulation Timer
+    useEffect(() => {
+        let demoTimer;
+        if (isDemoMode && isStreaming && isActive && !isCalibrating) {
+            const demoSequence = ['HELLO', 'MY', 'NAME', 'AI', 'WHAT', 'YOUR', 'NAME'];
+            let idx = 0;
+
+            demoTimer = setInterval(() => {
+                if (idx < demoSequence.length) {
+                    handlePredictionResult(demoSequence[idx], demoSequence[idx], 0.95);
+                    idx++;
+                } else {
+                    idx = 0; // loop
+                }
+            }, 1000);
+        }
+        return () => clearInterval(demoTimer);
+    }, [isDemoMode, isStreaming, isActive, handlePredictionResult, isCalibrating]);
+
     // Start webcam
     const startCamera = async () => {
+        if (isDemoMode) {
+            setIsStreaming(true)
+            setIsCalibrating(true)
+
+            // Fake calibration for demo
+            let progress = 0;
+            const sim = setInterval(() => {
+                progress += 25;
+                setCalibrationProgress(progress);
+                if (progress >= 100) {
+                    setIsCalibrating(false);
+                    clearInterval(sim);
+                }
+            }, 500);
+            return;
+        }
+
         try {
             setError(null)
+            setIsCalibrating(true)
+            setCalibrationProgress(0)
 
             if (!holisticRef.current) {
                 const holistic = new Holistic({
@@ -177,6 +217,8 @@ function SignToTextPanel({ onRecognition, isConnected, isActive }) {
             videoRef.current.srcObject = null
         }
         setIsStreaming(false)
+        setIsCalibrating(false)
+        setCalibrationProgress(0)
         setCurrentPrediction(null)
         setCurrentGloss(null)
         setGlossBuffer([])
@@ -225,6 +267,21 @@ function SignToTextPanel({ onRecognition, isConnected, isActive }) {
         ctx.restore()
 
         ctx.restore()
+
+        // --- CALIBRATION CHECK ---
+        if (isCalibrating) {
+            if (results.poseLandmarks && (results.leftHandLandmarks || results.rightHandLandmarks)) {
+                setCalibrationProgress(prev => {
+                    const next = prev + 5;
+                    if (next >= 100) {
+                        setIsCalibrating(false);
+                        return 100;
+                    }
+                    return next;
+                });
+            }
+            return; // Skip extraction while calibrating
+        }
 
         // Extract and flatten landmarks
         // Backend expects 225 features: (33 pose + 21 left + 21 right) * 3 (x,y,z) = 225 features per frame
@@ -378,10 +435,20 @@ function SignToTextPanel({ onRecognition, isConnected, isActive }) {
                 {/* Landmark overlay would go here */}
                 {isStreaming && (
                     <div className="landmark-overlay">
-                        <div className="landmark-status">
-                            <span className="status-dot online"></span>
-                            <span>Detecting...</span>
-                        </div>
+                        {isCalibrating ? (
+                            <div className="calibration-status">
+                                <Loader2 size={16} className="spin text-primary" />
+                                <span>Calibrating Camera... {calibrationProgress}%</span>
+                                <div className="calibration-bar">
+                                    <div className="calibration-fill" style={{ width: `${calibrationProgress}%` }}></div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="landmark-status">
+                                <span className="status-dot online"></span>
+                                <span>{isDemoMode ? 'Demo Sensor Active' : 'Detecting...'}</span>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

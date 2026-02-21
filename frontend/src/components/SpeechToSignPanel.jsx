@@ -11,11 +11,12 @@ import { Mic, MicOff, Play, Pause, Loader2 } from 'lucide-react'
 import AvatarScene from './AvatarScene'
 import './SpeechToSignPanel.css'
 
-function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive }) {
+function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive, isDemoMode }) {
     const [isListening, setIsListening] = useState(false)
     const [transcription, setTranscription] = useState('')
     const [glossSequence, setGlossSequence] = useState([])
     const [isPlaying, setIsPlaying] = useState(false)
+    const [isTranslating, setIsTranslating] = useState(false)
     const recognitionRef = useRef(null)
 
     // Initialize Web Speech API
@@ -81,6 +82,7 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive }) {
     }, [isActive, isListening, recognitionRef])
 
     const translateToGloss = async (text) => {
+        setIsTranslating(true)
         try {
             const response = await fetch('http://localhost:8000/translate-to-gloss', {
                 method: 'POST',
@@ -101,6 +103,8 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive }) {
             }
         } catch (err) {
             console.error("Translation API Error:", err);
+        } finally {
+            setIsTranslating(false)
         }
     }
 
@@ -108,7 +112,21 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive }) {
 
     // Start listening
     const toggleListening = () => {
-        if (!recognitionRef.current || !isActive) return;
+        if (!isActive) return;
+
+        if (isDemoMode) {
+            if (isListening) return;
+            setIsListening(true);
+            setTimeout(() => {
+                const demoTxt = "Welcome to the sign language translation demo.";
+                setTranscription(demoTxt);
+                setIsListening(false);
+                translateToGloss(demoTxt);
+            }, 1000);
+            return;
+        }
+
+        if (!recognitionRef.current) return;
 
         if (isListening) {
             recognitionRef.current.stop();
@@ -214,7 +232,10 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive }) {
                 </div>
 
                 <div className="gloss-box">
-                    <span className="box-label">Sign Gloss</span>
+                    <span className="box-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        Sign Gloss
+                        {isTranslating && <Loader2 size={12} className="spin text-primary" />}
+                    </span>
                     <div className="gloss-sequence">
                         {glossSequence.length > 0 ? (
                             glossSequence.map((gloss, index) => (
@@ -236,7 +257,7 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive }) {
             <div className="panel-footer">
                 <button
                     className={`btn mic-btn ${isListening ? 'btn-recording' : 'btn-primary'}`}
-                    onClick={isListening ? stopListening : startListening}
+                    onClick={toggleListening}
                 >
                     {isListening ? (
                         <>
