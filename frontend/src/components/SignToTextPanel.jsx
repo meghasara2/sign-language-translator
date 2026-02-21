@@ -270,7 +270,8 @@ function SignToTextPanel({ onRecognition, isConnected, isActive, isDemoMode }) {
 
         // --- CALIBRATION CHECK ---
         if (isCalibrating) {
-            if (results.poseLandmarks && (results.leftHandLandmarks || results.rightHandLandmarks)) {
+            // Revert strict hand requirement so users don't get stuck if they are just resting their hands
+            if (results.poseLandmarks || results.faceLandmarks) {
                 setCalibrationProgress(prev => {
                     const next = prev + 5;
                     if (next >= 100) {
