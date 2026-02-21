@@ -15,7 +15,6 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
     const [isListening, setIsListening] = useState(false)
     const [transcription, setTranscription] = useState('')
     const [glossSequence, setGlossSequence] = useState([])
-    const [currentAnimationIndex, setCurrentAnimationIndex] = useState(0)
     const [isPlaying, setIsPlaying] = useState(false)
     const recognitionRef = useRef(null)
 
@@ -83,7 +82,6 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
             if (response.ok) {
                 const data = await response.json();
                 setGlossSequence(data.gloss);
-                setCurrentAnimationIndex(0);
                 setIsPlaying(true);
 
                 onGloss?.(data.gloss);
@@ -95,42 +93,7 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
         }
     }
 
-    // Play through animation sequence with 'Rest/Idle' interpolation
-    useEffect(() => {
-        if (!isPlaying || glossSequence.length === 0) return
-
-        if (currentAnimationIndex < glossSequence.length * 2) {
-
-            // Even indexes are actual signs. Odd indexes are brief 'IDLE' rest poses.
-            const isRestPose = currentAnimationIndex % 2 !== 0;
-            const delay = isRestPose ? 300 : 1800; // 300ms rest, 1.8s sign play time
-
-            const timer = setTimeout(() => {
-                setCurrentAnimationIndex(prev => prev + 1)
-            }, delay)
-
-            return () => clearTimeout(timer)
-        } else {
-            setIsPlaying(false)
-        }
-    }, [isPlaying, currentAnimationIndex, glossSequence])
-
-    // Derive the actual string to send to the avatar
-    const getActiveSign = () => {
-        if (!isPlaying || glossSequence.length === 0) return null;
-        if (currentAnimationIndex >= glossSequence.length * 2) return null;
-
-        // If it's an odd index, we want the avatar to interpolate back to IDLE
-        if (currentAnimationIndex % 2 !== 0) return 'IDLE';
-
-        // Otherwise, return the actual gloss word
-        const actualIndex = Math.floor(currentAnimationIndex / 2);
-        return glossSequence[actualIndex];
-    }
-
-    const currentGlossText = getActiveSign();
-    // For UI Highlighting, we only care about the actual words
-    const displayIndex = Math.floor(currentAnimationIndex / 2);
+    // Playback state is now managed internally by AvatarScene based on isPlaying and the array.
 
     // Start listening
     const startListening = () => {
@@ -158,12 +121,10 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
         if (isPlaying) {
             setIsPlaying(false)
         } else if (glossSequence.length > 0) {
-            setCurrentAnimationIndex(0)
             setIsPlaying(true)
         }
     }
 
-    const currentGloss = getActiveSign()
 
     return (
         <div className="speech-to-sign-panel">
@@ -204,7 +165,7 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
 
                         {/* Avatar */}
                         <AvatarScene
-                            currentSign={currentGlossText}
+                            currentSign={glossSequence}
                             isPlaying={isPlaying}
                             avatarUrl={avatarUrl}
                         />
@@ -228,15 +189,7 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
                     </Suspense>
                 </Canvas>
 
-                {/* Current Sign Display */}
-                <div className="current-sign-overlay">
-                    {currentGlossText && currentGlossText !== 'IDLE' && (
-                        <div className="current-sign">
-                            <span className="sign-label">Signing:</span>
-                            <span className="sign-text">{currentGlossText}</span>
-                        </div>
-                    )}
-                </div>
+                {/* Legacy UI Overlay removed as avatar manages own state now */}
 
                 {/* Loading Indicator */}
                 {!isConnected && (
@@ -263,7 +216,7 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
                             glossSequence.map((gloss, index) => (
                                 <span
                                     key={index}
-                                    className={`gloss-item ${index === displayIndex && isPlaying ? 'active' : ''} ${index < displayIndex ? 'done' : ''}`}
+                                    className="gloss-item"
                                 >
                                     {gloss}
                                 </span>
