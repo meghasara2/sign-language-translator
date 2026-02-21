@@ -5,7 +5,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Camera as LucideCamera, CameraOff, Volume2, VolumeX, Loader2, AlertCircle } from 'lucide-react'
+import { Camera as LucideCamera, CameraOff, Volume2, VolumeX, Loader2, AlertCircle, Copy, Check } from 'lucide-react'
 import { Holistic } from '@mediapipe/holistic'
 import { Camera } from '@mediapipe/camera_utils'
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils'
@@ -17,7 +17,7 @@ import {
 import useWebSocket from '../hooks/useWebSocket'
 import './SignToTextPanel.css'
 
-function SignToTextPanel({ onRecognition, isConnected }) {
+function SignToTextPanel({ onRecognition, isConnected, isActive }) {
     const videoRef = useRef(null)
     const canvasRef = useRef(null)
     const [isStreaming, setIsStreaming] = useState(false)
@@ -28,6 +28,7 @@ function SignToTextPanel({ onRecognition, isConnected }) {
     const [isTranslating, setIsTranslating] = useState(false)
     const [confidence, setConfidence] = useState(0)
     const [error, setError] = useState(null)
+    const [copied, setCopied] = useState(false)
 
     // WebSocket connection (Disabled while using POST for prediction)
     // const { isOpen, send, lastMessage } = useWebSocket(
@@ -185,6 +186,10 @@ function SignToTextPanel({ onRecognition, isConnected }) {
     const onResults = useCallback((results) => {
         if (!canvasRef.current) return
 
+        // THROTTLE: Only process landmarks if this panel is currently active
+        // This saves massive amounts of CPU/GPU when user is speaking to the avatar
+        if (!isActive) return;
+
         const canvas = canvasRef.current
         const ctx = canvas.getContext('2d')
 
@@ -266,8 +271,8 @@ function SignToTextPanel({ onRecognition, isConnected }) {
 
         // Check if we should send for prediction
         const now = Date.now()
-        // Only predict if we have 30 frames AND we haven't predicted in the last x ms (e.g. 1000ms = 1 sec)
-        if (framesBufferRef.current.length === 30 && (now - lastPredictionTimeRef.current) > 1000) {
+        // Only predict if we have 30 frames, haven't predicted recently, AND the panel is active
+        if (framesBufferRef.current.length === 30 && (now - lastPredictionTimeRef.current) > 1000 && isActive) {
 
             // Check if hands are present in the final frame before predicting
             if (results.leftHandLandmarks || results.rightHandLandmarks) {
@@ -302,11 +307,19 @@ function SignToTextPanel({ onRecognition, isConnected }) {
 
     // Text-to-Speech
     const speak = (text) => {
-        if ('speechSynthesis' in window) {
+        if ('speechSynthesis' in window && isActive) {
             const utterance = new SpeechSynthesisUtterance(text)
             utterance.rate = 0.9
             utterance.pitch = 1
             window.speechSynthesis.speak(utterance)
+        }
+    }
+
+    const handleCopy = () => {
+        if (currentPrediction) {
+            navigator.clipboard.writeText(currentPrediction)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
         }
     }
 
@@ -376,7 +389,14 @@ function SignToTextPanel({ onRecognition, isConnected }) {
             {/* Prediction Display */}
             <div className="prediction-area">
                 <div className="prediction-box text-box">
-                    <span className="box-label">TRANSCRIPTION</span>
+                    <div className="box-header">
+                        <span className="box-label">TRANSCRIPTION</span>
+                        {currentPrediction && (
+                            <button className="copy-btn" onClick={handleCopy} title="Copy to clipboard">
+                                {copied ? <Check size={16} className="text-secondary" /> : <Copy size={16} />}
+                            </button>
+                        )}
+                    </div>
                     {currentPrediction ? (
                         <span className="prediction-text">{currentPrediction}</span>
                     ) : (

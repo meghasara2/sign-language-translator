@@ -19,6 +19,7 @@ function App() {
     const [transcript, setTranscript] = useState([])
     const [avatarUrl, setAvatarUrl] = useState('/avatar.glb')
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const [resetKey, setResetKey] = useState(0) // Global toggle to force child re-renders/resets
 
     // Check backend connection
     useEffect(() => {
@@ -107,14 +108,20 @@ function App() {
             <nav className="mode-selector">
                 <button
                     className={`mode-btn ${activeMode === 'sign-to-text' || activeMode === 'both' ? 'active' : ''}`}
-                    onClick={() => setActiveMode(activeMode === 'both' ? 'sign-to-text' : 'both')}
+                    onClick={() => {
+                        setActiveMode(activeMode === 'both' ? 'sign-to-text' : 'both')
+                        setResetKey(prev => prev + 1)
+                    }}
                 >
                     <Hand size={20} />
                     <span>Sign → Text</span>
                 </button>
                 <button
                     className={`mode-btn ${activeMode === 'speech-to-sign' || activeMode === 'both' ? 'active' : ''}`}
-                    onClick={() => setActiveMode(activeMode === 'both' ? 'speech-to-sign' : 'both')}
+                    onClick={() => {
+                        setActiveMode(activeMode === 'both' ? 'speech-to-sign' : 'both')
+                        setResetKey(prev => prev + 1)
+                    }}
                 >
                     <Mic size={20} />
                     <span>Speech → Sign</span>
@@ -128,8 +135,10 @@ function App() {
                     {(activeMode === 'sign-to-text' || activeMode === 'both') && (
                         <div className="panel panel-left animate-slideIn">
                             <SignToTextPanel
+                                key={`sign-${resetKey}`}
                                 onRecognition={(text) => addTranscript({ type: 'sign', text })}
                                 isConnected={backendStatus === 'online'}
+                                isActive={activeMode === 'sign-to-text' || activeMode === 'both'}
                             />
                         </div>
                     )}
@@ -138,9 +147,11 @@ function App() {
                     {(activeMode === 'speech-to-sign' || activeMode === 'both') && (
                         <div className="panel panel-right animate-slideIn" style={{ animationDelay: '0.1s' }}>
                             <SpeechToSignPanel
+                                key={`speech-${resetKey}`}
                                 onGloss={(gloss) => addTranscript({ type: 'speech', text: gloss.join(' ') })}
                                 isConnected={backendStatus === 'online'}
                                 avatarUrl={avatarUrl}
+                                isActive={activeMode === 'speech-to-sign' || activeMode === 'both'}
                             />
                         </div>
                     )}

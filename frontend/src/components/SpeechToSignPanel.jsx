@@ -11,7 +11,7 @@ import { Mic, MicOff, Play, Pause, Loader2 } from 'lucide-react'
 import AvatarScene from './AvatarScene'
 import './SpeechToSignPanel.css'
 
-function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
+function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive }) {
     const [isListening, setIsListening] = useState(false)
     const [transcription, setTranscription] = useState('')
     const [glossSequence, setGlossSequence] = useState([])
@@ -62,12 +62,23 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
 
         recognitionRef.current = recognition;
 
+        // Cleanup on unmount or mode switch
         return () => {
             if (recognitionRef.current) {
                 recognitionRef.current.abort();
             }
-        }
+        };
     }, [])
+
+    // Force stop if the panel becomes inactive
+    useEffect(() => {
+        if (!isActive && isListening && recognitionRef.current) {
+            recognitionRef.current.stop();
+            setIsListening(false);
+            setTranscription('');
+            setGlossSequence([]);
+        }
+    }, [isActive, isListening, recognitionRef])
 
     const translateToGloss = async (text) => {
         try {
@@ -96,23 +107,17 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
     // Playback state is now managed internally by AvatarScene based on isPlaying and the array.
 
     // Start listening
-    const startListening = () => {
-        if (recognitionRef.current && !isListening) {
+    const toggleListening = () => {
+        if (!recognitionRef.current || !isActive) return;
+
+        if (isListening) {
+            recognitionRef.current.stop();
+        } else {
             try {
                 recognitionRef.current.start();
-                setTranscription(''); // clear previous
-                setGlossSequence([]);
             } catch (err) {
                 console.error("Couldn't start recognition:", err);
             }
-        }
-    }
-
-    // Stop listening
-    const stopListening = () => {
-        if (recognitionRef.current && isListening) {
-            recognitionRef.current.stop();
-            setIsListening(false);
         }
     }
 
@@ -124,7 +129,6 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
             setIsPlaying(true)
         }
     }
-
 
     return (
         <div className="speech-to-sign-panel">
