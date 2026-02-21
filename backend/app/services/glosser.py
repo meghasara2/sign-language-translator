@@ -16,8 +16,20 @@ Examples:
 """
 
 import re
-from typing import List, Dict, Tuple
+import os
+from typing import List, Dict, Tuple, Optional
 from loguru import logger
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    logger.warning("google-generativeai not installed. LLM translation disabled.")
 
 
 class Glosser:
@@ -133,28 +145,74 @@ class Glosser:
             supported_vocabulary: List of supported sign glosses (for filtering)
         """
         self.supported_vocabulary = set(supported_vocabulary) if supported_vocabulary else None
+        
+        # Initialize Gemini if available
+        self.api_key = os.getenv("GEMINI_API_KEY")
+        self.model = None
+        
+        if GEMINI_AVAILABLE and self.api_key:
+            try:
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel('gemini-1.5-flash')
+                logger.info("Glosser: Gemini 1.5 Flash initialized for intelligent translation")
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini: {e}")
+        else:
+            logger.warning("Glosser: Running in rule-based mode (No GEMINI_API_KEY found)")
+            
         logger.info("Glosser initialized")
     
-    def gloss(self, text: str) -> List[str]:
+    async def llm_gloss(self, text: str) -> List[str]:
+        """Use Gemini to translate English to ASL/ISL Gloss."""
+        if not self.model:
+            return []
+            
+        prompt = f"""
+        Convert the following English sentence into a simplified Sign Language Gloss sequence (uppercase words, no articles, SVO to OSV where appropriate). 
+        
+        Input: "{text}"
+        
+        Return ONLY a comma-separated list of the Gloss words. Example: "NAME YOU WHAT" or "STORE I GO".
+        """
+        
+        try:
+            response = self.model.generate_content(prompt)
+            if response and response.text:
+                # Clean up response (remove punctuation, split by comma or space)
+                gloss_text = response.text.upper().replace(',', ' ').strip()
+                glosses = [g for g in gloss_text.split() if g]
+                logger.info(f"Gemini translated '{text}' -> {glosses}")
+                return glosses
+        except Exception as e:
+            logger.error(f"Gemini translation failed: {e}")
+            
+        return []
+
+    async def gloss(self, text: str) -> List[str]:
         """
         Convert English text to Sign Language gloss sequence.
-        
-        Args:
-            text: English sentence
-        
-        Returns:
-            List of sign glosses
+        Uses a tiered approach: 1. Rules, 2. LLM (if enabled), 3. Basic Mapping.
         """
         # Lowercase and clean
+        original_text = text
         text = text.lower().strip()
         
-        # Try pattern matching for common question structures
+        # Tier 1: Pattern matching for common structures (fastest)
         for pattern, replacement in self.QUESTION_PATTERNS:
             match = re.match(pattern, text)
             if match:
                 result = replacement(match)
+                logger.info(f"Rule match: '{original_text}' -> {result}")
                 return self._filter_vocabulary(result.split())
         
+        # Tier 2: LLM Translation (most intelligent)
+        if self.model:
+            llm_result = await self.llm_gloss(text)
+            if llm_result:
+                return self._filter_vocabulary(llm_result)
+        
+        # Tier 3: Basic Token-based mapping (fallback)
+        logger.debug(f"Using fallback mapping for: {text}")
         # Remove punctuation (except apostrophes in contractions)
         text = re.sub(r"[^\w\s']", '', text)
         

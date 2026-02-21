@@ -149,6 +149,8 @@ async def predict_sign(request: PredictionRequest):
         return {"error": str(e), "gloss": "ERROR", "text": "Error processing sequence"}
 
 
+from app.services.glosser import get_glosser
+
 @app.post("/translate-to-gloss")
 async def translate_to_gloss(request: TranslationRequest):
     """
@@ -159,20 +161,10 @@ async def translate_to_gloss(request: TranslationRequest):
         if not text:
             return {"error": "Empty text provided", "gloss": []}
             
-        import re
+        glosser = get_glosser()
+        gloss = await glosser.gloss(text)
         
-        # Simple NLP logic to simulate English -> ASL Gloss conversion
-        # 1. Uppercase & remove punctuation
-        clean_text = re.sub(r'[^\w\s]', '', text).upper()
-        
-        # 2. Tokenize
-        words = clean_text.split()
-        
-        # 3. Simple Stopword removal and mapping (can be expanded later)
-        stopwords = {"AM", "IS", "ARE", "WAS", "WERE", "BE", "BEING", "BEEN", "A", "AN", "THE", "TO"}
-        gloss = [word for word in words if word not in stopwords]
-        
-        logger.info(f"Translated '{text}' -> Gloss Sequence: {gloss}")
+        logger.info(f"Intelligent translation: '{text}' -> Gloss Sequence: {gloss}")
         
         return {
             "text": text,
