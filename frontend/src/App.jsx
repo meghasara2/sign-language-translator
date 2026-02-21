@@ -14,6 +14,8 @@ import './App.css'
 function App() {
     const [activeMode, setActiveMode] = useState('both') // 'sign-to-text', 'speech-to-sign', 'both'
     const [backendStatus, setBackendStatus] = useState('connecting')
+    const [geminiStatus, setGeminiStatus] = useState('checking')
+    const [cameraStatus, setCameraStatus] = useState('standby')
     const [transcript, setTranscript] = useState([])
     const [avatarUrl, setAvatarUrl] = useState('/avatar.glb')
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -22,25 +24,32 @@ function App() {
     useEffect(() => {
         const checkBackend = async () => {
             try {
-                const response = await fetch('/api/vocabulary')
+                const response = await fetch('http://localhost:8000/')
                 if (response.ok) {
+                    const data = await response.json()
                     setBackendStatus('online')
+                    setGeminiStatus(data.gemini_api || 'offline')
                 } else {
                     setBackendStatus('offline')
+                    setGeminiStatus('offline')
                 }
             } catch (error) {
-                // Try direct connection
-                try {
-                    const directResponse = await fetch('http://localhost:8000/')
-                    if (directResponse.ok) {
-                        setBackendStatus('online')
-                    } else {
-                        setBackendStatus('offline')
-                    }
-                } catch {
-                    setBackendStatus('offline')
-                }
+                setBackendStatus('offline')
+                setGeminiStatus('offline')
             }
+        }
+
+        // Check camera permission state without prompting if possible
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({ name: 'camera' }).then(res => {
+                if (res.state === 'granted') setCameraStatus('online')
+                else if (res.state === 'denied') setCameraStatus('offline')
+
+                res.onchange = () => {
+                    if (res.state === 'granted') setCameraStatus('online')
+                    else if (res.state === 'denied') setCameraStatus('offline')
+                }
+            }).catch(() => { /* Ignore on browsers that don't support camera in permission query */ })
         }
 
         checkBackend()
@@ -69,12 +78,16 @@ function App() {
                 </div>
 
                 <div className="header-right">
-                    <div className={`status-indicator ${backendStatus}`}>
-                        <div className={`status-dot ${backendStatus}`}></div>
-                        <span>
-                            {backendStatus === 'online' ? 'Connected' :
-                                backendStatus === 'connecting' ? 'Connecting...' : 'Offline'}
-                        </span>
+                    <div className="system-check-dashboard glass">
+                        <div className={`status-item ${backendStatus}`}>
+                            <span className={`status-dot ${backendStatus}`}></span> Backend
+                        </div>
+                        <div className={`status-item ${cameraStatus}`}>
+                            <span className={`status-dot ${cameraStatus}`}></span> Camera
+                        </div>
+                        <div className={`status-item ${geminiStatus}`}>
+                            <span className={`status-dot ${geminiStatus}`}></span> Gemini API
+                        </div>
                     </div>
 
                     <button

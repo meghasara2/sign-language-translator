@@ -75,9 +75,13 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
+from dotenv import load_dotenv
+load_dotenv()
+
 @app.get("/")
 async def root():
     """Health check endpoint."""
+    gemini_key = os.getenv("GEMINI_API_KEY")
     return {
         "status": "online",
         "service": "DeepBridge",
@@ -85,7 +89,8 @@ async def root():
         "pipelines": {
             "sign_to_text": "ready",
             "speech_to_sign": "ready"
-        }
+        },
+        "gemini_api": "online" if gemini_key else "offline"
     }
 
 
