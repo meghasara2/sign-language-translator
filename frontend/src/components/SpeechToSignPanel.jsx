@@ -51,14 +51,27 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive, isDemoMo
 
         recognition.onerror = (event) => {
             console.error("[SpeechRecognition] Error:", event.error);
-            if (event.error !== 'no-speech') {
-                setIsListening(false);
+            if (event.error === 'no-speech') {
+                // Ignore no-speech, let onend handle the restart if still listening
+                return;
             }
+            setIsListening(false);
         };
 
         recognition.onend = () => {
             console.log("[SpeechRecognition] Disconnected.");
-            setIsListening(false);
+            // If the user didn't explicitly stop it, try to restart it (continuous listening workaround)
+            setIsListening((currentlyListening) => {
+                if (currentlyListening && recognitionRef.current && isActive) {
+                    try {
+                        recognitionRef.current.start();
+                        return true;
+                    } catch (e) {
+                        return false;
+                    }
+                }
+                return false;
+            });
         };
 
         recognitionRef.current = recognition;
@@ -129,12 +142,15 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive, isDemoMo
         if (!recognitionRef.current) return;
 
         if (isListening) {
+            setIsListening(false); // Explicitly set to false so onend doesn't restart it
             recognitionRef.current.stop();
         } else {
             try {
+                setIsListening(true);
                 recognitionRef.current.start();
             } catch (err) {
                 console.error("Couldn't start recognition:", err);
+                setIsListening(false);
             }
         }
     }
