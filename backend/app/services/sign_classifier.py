@@ -8,8 +8,14 @@ import torch
 import torch.nn as nn
 import numpy as np
 from pathlib import Path
+import json
+import os
 from typing import Tuple, List, Optional
 from loguru import logger
+
+DATA_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'data')
+MODEL_PATH = os.path.join(DATA_DIR, 'models', 'sign_classifier.pth')
+VOCAB_PATH = os.path.join(DATA_DIR, 'vocabulary.json')
 
 
 class SignLSTM(nn.Module):
@@ -106,30 +112,39 @@ class SignClassifier:
         
         logger.info(f"SignClassifier using device: {self.device}")
         
-        # Default vocabulary (placeholder - will be loaded from file)
-        self.vocabulary = vocabulary or [
-            "HELLO", "GOODBYE", "THANK_YOU", "PLEASE", "SORRY",
-            "YES", "NO", "HELP", "NAME", "YOU", "ME", "WHAT",
-            "WHERE", "WHEN", "HOW", "WHY", "WHO", "LOVE", "FRIEND",
-            "FAMILY", "EAT", "DRINK", "SLEEP", "WORK", "SCHOOL",
-            "HOME", "HAPPY", "SAD", "GOOD", "BAD"
-        ]
+        # Default vocabulary (placeholder)
+        self.vocabulary = ["HELLO", "THANK_YOU", "YES", "NO", "PLEASE"]
+        
+        # Load vocabulary from JSON if available
+        if os.path.exists(VOCAB_PATH):
+            try:
+                with open(VOCAB_PATH, 'r') as f:
+                    self.vocabulary = json.load(f)
+                logger.info(f"Loaded {len(self.vocabulary)} classes from {VOCAB_PATH}")
+            except Exception as e:
+                logger.error(f"Failed to load vocabulary: {e}")
+        else:
+            logger.warning(f"Vocabulary not found at {VOCAB_PATH}. Using default.")
         
         # Initialize model
         self.model = SignLSTM(
             input_size=225,  # 33*3 + 21*3 + 21*3 = 225
-            hidden_size=128,
+            hidden_size=64,  # Match train_model.py
             num_layers=2,
             num_classes=len(self.vocabulary),
             dropout=0.3
         ).to(self.device)
         
-        # Load weights if provided
-        if model_path and Path(model_path).exists():
-            self.load_model(model_path)
-            logger.info(f"Loaded model from {model_path}")
+        # Load weights if trained model exists
+        actual_model_path = model_path if model_path else MODEL_PATH
+        if Path(actual_model_path).exists():
+            try:
+                self.model.load_state_dict(torch.load(actual_model_path, map_location=self.device))
+                logger.info(f"Loaded trained model from {actual_model_path}")
+            except Exception as e:
+                logger.error(f"Failed to load weights: {e}")
         else:
-            logger.warning("No model weights loaded. Using random initialization.")
+            logger.warning(f"No trained model found at {actual_model_path}. Model will output random predictions! Run collect_data.py and train_model.py first.")
         
         self.model.eval()
     
@@ -138,11 +153,19 @@ class SignClassifier:
         Predict sign from landmark sequence.
         
         Args:
-            sequence: Numpy array of shape (seq_len, features)
+            sequence: Numpy array of shape (seq_len, features) (e.g. 30x225)
         
         Returns:
             (predicted_sign, confidence)
         """
+        # If the model is completely untrained (random weights), return a dummy answer to prevent crashes,
+        # unless you purposefully want it to guess. Let's let it guess, but the warning above informs the user.
+        
+        # Validate Shape
+        if len(sequence) != 30 or len(sequence[0]) != 225:
+             logger.error(f"Invalid sequence shape: expected (30, 225), got ({len(sequence)}, {len(sequence[0]) if len(sequence) > 0 else 0})")
+             return "ERROR", 0.0
+
         with torch.no_grad():
             # Prepare input
             x = torch.FloatTensor(sequence).unsqueeze(0).to(self.device)
@@ -153,9 +176,13 @@ class SignClassifier:
             
             # Get prediction
             confidence, predicted_idx = torch.max(probabilities, 1)
-            predicted_sign = self.vocabulary[predicted_idx.item()]
             
-            return predicted_sign, confidence.item()
+            idx = predicted_idx.item()
+            if idx < len(self.vocabulary):
+                predicted_sign = self.vocabulary[idx]
+                return predicted_sign, confidence.item()
+            else:
+                return "UNKNOWN", 0.0
     
     def predict_topk(self, sequence: np.ndarray, k: int = 3) -> List[Tuple[str, float]]:
         """
