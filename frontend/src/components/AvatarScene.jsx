@@ -5,7 +5,7 @@
  * Uses a generic human base mesh styled to look like SignAvatars (smooth, solid color).
  */
 
-import { useRef, useEffect, useMemo, useState } from 'react'
+import { useRef, useEffect, useMemo, useState, useCallback } from 'react'
 import { useGLTF, useAnimations } from '@react-three/drei'
 
 function AvatarScene({ currentSign, isPlaying, avatarUrl = '/avatar.glb' }) {
