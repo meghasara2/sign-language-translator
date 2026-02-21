@@ -7,6 +7,7 @@
 
 import { useRef, useEffect, useMemo, useState, useCallback } from 'react'
 import { useGLTF, useAnimations } from '@react-three/drei'
+import * as THREE from 'three'
 
 function AvatarScene({ currentSign, isPlaying, avatarUrl = '/avatar.glb' }) {
     const group = useRef()
@@ -29,8 +30,39 @@ function AvatarScene({ currentSign, isPlaying, avatarUrl = '/avatar.glb' }) {
         return clone
     }, [modelScene])
 
-    // Get animation actions using the Library Animations on our Group
-    const { actions, mixer } = useAnimations(libraryAnimations, group)
+    // Generate a fallback 'Default Wave' animation programmatically in case the GLB has no clips
+    const defaultWaveClip = useMemo(() => {
+        const yTrack = new THREE.VectorKeyframeTrack(
+            '.position',
+            [0, 0.5, 1, 1.5, 2],
+            [
+                0, -1.6, 0,
+                0, -1.3, 0, // Bob up
+                0, -1.6, 0,
+                0, -1.3, 0, // Bob up
+                0, -1.6, 0
+            ]
+        )
+        const rotTrack = new THREE.QuaternionKeyframeTrack(
+            '.quaternion',
+            [0, 0.5, 1, 1.5, 2],
+            [
+                0, 0, 0, 1,
+                0, 0.2, 0, 0.979, // Rotate right
+                0, 0, 0, 1,
+                0, -0.2, 0, 0.979, // Rotate left
+                0, 0, 0, 1
+            ]
+        )
+        return new THREE.AnimationClip('Default Wave', 2, [yTrack, rotTrack])
+    }, [])
+
+    const mergedAnimations = useMemo(() => {
+        return [...libraryAnimations, defaultWaveClip]
+    }, [libraryAnimations, defaultWaveClip])
+
+    // Get animation actions using the merged Animations on our Group
+    const { actions, mixer } = useAnimations(mergedAnimations, group)
     const [currentAction, setCurrentAction] = useState(null)
     const [queue, setQueue] = useState([])
     const [isAnimatingSeq, setIsAnimatingSeq] = useState(false)
@@ -59,6 +91,13 @@ function AvatarScene({ currentSign, isPlaying, avatarUrl = '/avatar.glb' }) {
         'IDLE': 'Idle'
     }), [])
 
+    // Debug: Print available animations on mount
+    useEffect(() => {
+        if (actions) {
+            console.log("[Avatar] Available animation clips in model:", Object.keys(actions))
+        }
+    }, [actions])
+
     // When the gloss sequence changes from props (SpeechToSignPanel), enqueue them.
     useEffect(() => {
         if (isPlaying && currentSign && Array.isArray(currentSign) && currentSign.length > 0) {
@@ -77,8 +116,16 @@ function AvatarScene({ currentSign, isPlaying, avatarUrl = '/avatar.glb' }) {
 
         let targetClipName = clipName
         if (!actions[targetClipName]) {
-            console.warn(`[Avatar] Animation '${targetClipName}' not found. Fallback to Idle.`)
-            targetClipName = 'Idle'
+            const available = Object.keys(actions)
+            if (available.length === 0) {
+                console.warn(`[Avatar] No animations found in model!`)
+                return
+            }
+
+            // Fallback logic
+            const fallback = available.includes('Default Wave') ? 'Default Wave' : available[0]
+            console.warn(`[Avatar] Animation '${targetClipName}' not found. Fallback to '${fallback}'. Available:`, available)
+            targetClipName = fallback
         }
 
         const newAction = actions[targetClipName]
@@ -109,7 +156,7 @@ function AvatarScene({ currentSign, isPlaying, avatarUrl = '/avatar.glb' }) {
                 // Remove the played sign from the queue
                 setQueue(prev => prev.slice(1))
             } else {
-                // Queue is empty, return to Idle
+                // Queue is empty, return to Idle or a safe fallback
                 playAnimation('Idle')
                 setIsAnimatingSeq(false)
             }
@@ -124,13 +171,13 @@ function AvatarScene({ currentSign, isPlaying, avatarUrl = '/avatar.glb' }) {
 
     // Kick off the very first animation when the sequence starts
     useEffect(() => {
-        if (isAnimatingSeq && queue.length > 0 && (!currentAction || currentAction._clip.name === 'Idle')) {
+        if (isAnimatingSeq && queue.length > 0 && (!currentAction || currentAction._clip.name === 'Idle' || currentAction._clip.name === Object.keys(actions || {})[0])) {
             const nextSign = queue[0]
             const clipName = signToClipMap[nextSign] || 'Idle'
             playAnimation(clipName)
             setQueue(prev => prev.slice(1))
         }
-    }, [isAnimatingSeq, queue, currentAction, playAnimation, signToClipMap])
+    }, [isAnimatingSeq, queue, currentAction, playAnimation, signToClipMap, actions])
 
     return (
         <group ref={group} dispose={null}>
