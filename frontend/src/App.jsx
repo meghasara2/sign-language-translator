@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react'
 import SignToTextPanel from './components/SignToTextPanel'
 import SpeechToSignPanel from './components/SpeechToSignPanel'
+import SettingsModal from './components/SettingsModal'
 import { Hand, Mic, Settings, Info, Loader2 } from 'lucide-react'
 import './App.css'
 
@@ -14,6 +15,8 @@ function App() {
     const [activeMode, setActiveMode] = useState('both') // 'sign-to-text', 'speech-to-sign', 'both'
     const [backendStatus, setBackendStatus] = useState('connecting')
     const [transcript, setTranscript] = useState([])
+    const [avatarUrl, setAvatarUrl] = useState('/avatar.glb')
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
     // Check backend connection
     useEffect(() => {
@@ -74,7 +77,11 @@ function App() {
                         </span>
                     </div>
 
-                    <button className="btn btn-secondary icon-btn" title="Settings">
+                    <button
+                        className="btn btn-secondary icon-btn"
+                        title="Settings"
+                        onClick={() => setIsSettingsOpen(true)}
+                    >
                         <Settings size={20} />
                     </button>
                     <button className="btn btn-secondary icon-btn" title="Info">
@@ -120,6 +127,7 @@ function App() {
                             <SpeechToSignPanel
                                 onGloss={(gloss) => addTranscript({ type: 'speech', text: gloss.join(' ') })}
                                 isConnected={backendStatus === 'online'}
+                                avatarUrl={avatarUrl}
                             />
                         </div>
                     )}
@@ -155,6 +163,14 @@ function App() {
                     </div>
                 </div>
             </main>
+
+            {/* Settings Modal */}
+            <SettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                avatarUrl={avatarUrl}
+                onAvatarChange={setAvatarUrl}
+            />
 
             {/* Footer */}
             <footer className="footer">

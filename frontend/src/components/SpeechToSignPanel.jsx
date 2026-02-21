@@ -11,7 +11,7 @@ import { Mic, MicOff, Play, Pause, Loader2 } from 'lucide-react'
 import AvatarScene from './AvatarScene'
 import './SpeechToSignPanel.css'
 
-function SpeechToSignPanel({ onGloss, isConnected }) {
+function SpeechToSignPanel({ onGloss, isConnected, avatarUrl }) {
     const [isListening, setIsListening] = useState(false)
     const [transcription, setTranscription] = useState('')
     const [glossSequence, setGlossSequence] = useState([])
@@ -206,6 +206,7 @@ function SpeechToSignPanel({ onGloss, isConnected }) {
                         <AvatarScene
                             currentSign={currentGlossText}
                             isPlaying={isPlaying}
+                            avatarUrl={avatarUrl}
                         />
 
                         {/* Environment */}
