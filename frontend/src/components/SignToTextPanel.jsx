@@ -18,7 +18,7 @@ import useWebSocket from '../hooks/useWebSocket'
 import './SignToTextPanel.css'
 
 function SignToTextPanel({ onRecognition, isConnected, isActive, isDemoMode }) {
-    const API_URL = import.meta.env.VITE_API_URL || 'https://sign-language-translator-bdlb.onrender.com'
+    const API_URL = 'https://sign-language-translator-bdlb.onrender.com'
     const videoRef = useRef(null)
     const canvasRef = useRef(null)
     const [isStreaming, setIsStreaming] = useState(false)

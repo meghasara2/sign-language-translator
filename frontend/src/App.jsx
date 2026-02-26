@@ -23,7 +23,7 @@ function App() {
     const [isDemoMode, setIsDemoMode] = useState(false)
 
     // Check backend connection
-    const API_URL = import.meta.env.VITE_API_URL || 'https://sign-language-translator-bdlb.onrender.com'
+    const API_URL = 'https://sign-language-translator-bdlb.onrender.com'
 
     useEffect(() => {
         const checkBackend = async () => {

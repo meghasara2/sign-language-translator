@@ -12,7 +12,7 @@ import AvatarScene from './AvatarScene'
 import './SpeechToSignPanel.css'
 
 function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive, isDemoMode }) {
-    const API_URL = import.meta.env.VITE_API_URL || 'https://sign-language-translator-bdlb.onrender.com'
+    const API_URL = 'https://sign-language-translator-bdlb.onrender.com'
     const [isListening, setIsListening] = useState(false)
     const [transcription, setTranscription] = useState('')
     const [glossSequence, setGlossSequence] = useState([])
