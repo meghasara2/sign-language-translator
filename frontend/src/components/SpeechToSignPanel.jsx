@@ -97,7 +97,7 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive, isDemoMo
     const translateToGloss = async (text) => {
         setIsTranslating(true)
         try {
-            const response = await fetch('http://localhost:8000/translate-to-gloss', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/translate-to-gloss`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

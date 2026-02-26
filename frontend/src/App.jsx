@@ -26,7 +26,7 @@ function App() {
     useEffect(() => {
         const checkBackend = async () => {
             try {
-                const response = await fetch('http://localhost:8000/')
+                const response = await fetch(`${import.meta.env.VITE_API_URL}/`)
                 if (response.ok) {
                     const data = await response.json()
                     setBackendStatus('online')

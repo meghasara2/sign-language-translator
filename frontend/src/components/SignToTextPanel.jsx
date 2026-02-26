@@ -95,7 +95,7 @@ function SignToTextPanel({ onRecognition, isConnected, isActive, isDemoMode }) {
                     setGlossBuffer([]) // Clear buffer immediately
 
                     try {
-                        const response = await fetch('http://localhost:8000/translate-to-english', {
+                        const response = await fetch(`${import.meta.env.VITE_API_URL}/translate-to-english`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ glosses: bufferToSend })
@@ -344,7 +344,7 @@ function SignToTextPanel({ onRecognition, isConnected, isActive, isDemoMode }) {
     // Send sequence to backend API
     const sendPredictionRequest = async (sequence) => {
         try {
-            const response = await fetch('http://localhost:8000/predict', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/predict`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
