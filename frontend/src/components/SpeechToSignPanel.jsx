@@ -12,6 +12,7 @@ import AvatarScene from './AvatarScene'
 import './SpeechToSignPanel.css'
 
 function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive, isDemoMode }) {
+    const API_URL = import.meta.env.VITE_API_URL || 'https://sign-language-translator-bdlb.onrender.com'
     const [isListening, setIsListening] = useState(false)
     const [transcription, setTranscription] = useState('')
     const [glossSequence, setGlossSequence] = useState([])
@@ -97,7 +98,7 @@ function SpeechToSignPanel({ onGloss, isConnected, avatarUrl, isActive, isDemoMo
     const translateToGloss = async (text) => {
         setIsTranslating(true)
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/translate-to-gloss`, {
+            const response = await fetch(`${API_URL}/translate-to-gloss`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

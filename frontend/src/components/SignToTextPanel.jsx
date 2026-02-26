@@ -18,6 +18,7 @@ import useWebSocket from '../hooks/useWebSocket'
 import './SignToTextPanel.css'
 
 function SignToTextPanel({ onRecognition, isConnected, isActive, isDemoMode }) {
+    const API_URL = import.meta.env.VITE_API_URL || 'https://sign-language-translator-bdlb.onrender.com'
     const videoRef = useRef(null)
     const canvasRef = useRef(null)
     const [isStreaming, setIsStreaming] = useState(false)
@@ -95,7 +96,7 @@ function SignToTextPanel({ onRecognition, isConnected, isActive, isDemoMode }) {
                     setGlossBuffer([]) // Clear buffer immediately
 
                     try {
-                        const response = await fetch(`${import.meta.env.VITE_API_URL}/translate-to-english`, {
+                        const response = await fetch(`${API_URL}/translate-to-english`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ glosses: bufferToSend })
@@ -344,7 +345,7 @@ function SignToTextPanel({ onRecognition, isConnected, isActive, isDemoMode }) {
     // Send sequence to backend API
     const sendPredictionRequest = async (sequence) => {
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/predict`, {
+            const response = await fetch(`${API_URL}/predict`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

@@ -23,10 +23,13 @@ function App() {
     const [isDemoMode, setIsDemoMode] = useState(false)
 
     // Check backend connection
+    const API_URL = import.meta.env.VITE_API_URL || 'https://sign-language-translator-bdlb.onrender.com'
+
     useEffect(() => {
         const checkBackend = async () => {
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL}/`)
+                console.log('[App] Checking backend at:', API_URL)
+                const response = await fetch(`${API_URL}/`)
                 if (response.ok) {
                     const data = await response.json()
                     setBackendStatus('online')
